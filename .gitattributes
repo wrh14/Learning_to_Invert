@@ -1,0 +1,10 @@
+.pt filter=lfs diff=lfs merge=lfs -text
+fl_settings/cola_shared_model.pt filter=lfs diff=lfs merge=lfs -text
+fl_settings/cola_train_dataset.pt filter=lfs diff=lfs merge=lfs -text
+fl_settings/wikitext_train_dataset.pt filter=lfs diff=lfs merge=lfs -text
+fl_settings/wikitext_shared_model.pt filter=lfs diff=lfs merge=lfs -text
+fl_settings/wikitext_test_dataset.pt filter=lfs diff=lfs merge=lfs -text
+fl_settings/wikitext_validation_dataset.pt filter=lfs diff=lfs merge=lfs -text
+fl_settings/cola_hist_word.pt filter=lfs diff=lfs merge=lfs -text
+fl_settings/cola_validation_dataset.pt filter=lfs diff=lfs merge=lfs -text
+fl_settings/wiki_hist_word.pt filter=lfs diff=lfs merge=lfs -text

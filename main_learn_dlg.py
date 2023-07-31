@@ -281,8 +281,6 @@ if args.dataset in ["CIFAR10"]:
 del checkpoint
 
 #learning
-# test_loss, _ = test(grad_to_img_net, test_loader, sign, prune_rate=prune_rate, leak_batch=leak_batch)
-# logger.info(f"initial test loss: {test_loss}")
 best_test_loss = 10000
 best_state_dict = None
 for epoch in tqdm(range(args.epochs)):
