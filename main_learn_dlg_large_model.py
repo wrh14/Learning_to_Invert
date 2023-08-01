@@ -51,10 +51,7 @@ logger = set_logger("", filepath=f"print_logs/{save_file_name}.txt")
 logger.info(args)
 logger.info(f"logs are saved at print_logs/{save_file_name}.txt")
 
-if args.dataset.startswith("wikitext") or args.dataset.startswith("cola"):
-    import sys
-    sys.path.append("/home/rw565/raft_leakage_from_gradient/baseline/breaching/")
-save_dir = "/home/rw565/raft_leakage_from_gradient/"
+save_dir = "./"
 
 def train(grad_to_img_net, net, data_loader, sign=False, mask=None, prune_rate=None, leak_batch=1):
     grad_to_img_net.train()

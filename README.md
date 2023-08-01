@@ -31,6 +31,16 @@ python main_learn_dlg_large_model.py --lr 1e-4 --epochs 200 --leak_mode prune-0.
 ```
 by setting `leak_mode` as `batch-4`, `sign-batch-4`, `prune-0.99-batch-4`, `gauss-0.1-batch-4`.
 
+### 1.3 OOD Auxiliary Data
+To reproduce the results in Table 2, run this script
+```
+python main_learn_dlg.py --lr 1e-4 --epochs 200 --leak_mode $leak_mode --model MLP-3000 --dataset CIFAR10 --shared_model LeNet --batch_size 256 --trainset ood
+```
+by setting `leak_mode` as `None`, `sign`, `prune-0.99`, `gauss-0.1`.
+
+### 1.4 Evaluation with Different Metrics for Vision Datasets
+Please check the Jupyter notebook `Results--Vision.ipynb`
+
 ## 2. Reproduce the Results of Language Dataset (Table 1)
 ### 2.1 COLA and BERT
 To reproduce the results in Table 1 for COLA and BERT, run the following script
@@ -45,6 +55,12 @@ To reproduce the results in Table 1 for COLA and BERT, run the following script
 python main_learn_dlg_large_model.py --epochs 100 --batch_size 64 --dataset wikitext-hash --shared_model Transformer --model NLPMLP-600-1000 --lr $lr --leak_mode $leak_mode
 ```
 by setting `(leak_mode, lr)` as `(None, 1e-3)`, `(sign, 1e-5)`, `(prune-0.99, 1e-3)`, `(gauss-0.001, 1e-4)`.
+
+### 2.3 OOD Auxiliary Data
+Run the scripts in 2.1 or 2.2 by setting `dataset` as `cola-pseudo-hash` or `wikitext-0.1-pseudo-hash` respectively.
+
+### 2.4 Evaluation with Different Metrics for Language Datasets
+Please check the Jupyter notebook `Results--Language.ipynb`
 
 ## Acknowledgement
 We would like to thank the authors of [Breaching](https://github.com/JonasGeiping/breaching), from where we use their federated learning framework in our experiments for language datasets and models.
