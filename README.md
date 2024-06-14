@@ -6,13 +6,14 @@ Ruihan Wu, Xiangyu Chen, Chuan Guo, and Kilian Q. Weinberger. [Learning To Inver
 ## 0. Code and Environment Preparation
 1. Clone the repo.
 ```
-git clone git@github.com:wrh14/Learning_to_Invert.git
+git clone https://github.com/wrh14/Learning_to_Invert.git
 cd Learning_to_Invert
 git lfs fetch
 ```
 2. Install the environment; python=`Python 3.9.18`
 ```
 conda env create -f environment.yml
+conda activate breaching
 ```
 
 ## 1. Reproduce the Results of Vision Dataset (Table 1)
