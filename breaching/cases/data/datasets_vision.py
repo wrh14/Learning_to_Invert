@@ -24,7 +24,6 @@ def _build_dataset_vision(cfg_data, split, can_download=True):
         dataset = torchvision.datasets.CIFAR10(
             root=cfg_data.path, train=split == "training", download=can_download, transform=_default_t,
         )
-        print("correct dataset", len(dataset))
         dataset.lookup = dict(zip(list(range(len(dataset))), dataset.targets))
     elif cfg_data.name == "CIFAR100":
         dataset = torchvision.datasets.CIFAR100(
@@ -61,7 +60,7 @@ def _build_dataset_vision(cfg_data, split, can_download=True):
         cfg_data.mean = data_mean
         cfg_data.std = data_std
 
-    transforms = _default_t
+    transforms = _parse_data_augmentations(cfg_data, split)
 
     # Apply transformations
     dataset.transform = transforms if transforms is not None else None
@@ -75,9 +74,8 @@ def _build_dataset_vision(cfg_data, split, can_download=True):
         dataset.std = [1]
 
     # Reduce train dataset according to cfg_data.size:
-#     if cfg_data.size < len(dataset):
-#         dataset = Subset(dataset, torch.arange(0, cfg_data.size))
-    print(len(dataset))
+    if cfg_data.size < len(dataset):
+        dataset = Subset(dataset, torch.arange(0, cfg_data.size))
 
     collate_fn = _torchvision_collate
     return dataset, collate_fn

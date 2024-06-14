@@ -11,8 +11,7 @@ from .nfnets import NFNet
 from .vgg import VGG
 
 from .language_models import RNNModel, TransformerModel, LinearModel
-from .losses import CausalLoss, MLMLoss
-from .resnet_our import resnet20
+from .losses import CausalLoss, MLMLoss, MostlyCausalLoss
 
 
 def construct_model(cfg_model, cfg_data, pretrained=True, **kwargs):
@@ -28,6 +27,8 @@ def construct_model(cfg_model, cfg_data, pretrained=True, **kwargs):
     # Choose loss function according to data and model:
     if "classification" in cfg_data.task:
         loss_fn = torch.nn.CrossEntropyLoss()
+    elif "causal-lm-sanity" in cfg_data.task:
+        loss_fn = MostlyCausalLoss()
     elif "causal-lm" in cfg_data.task:
         loss_fn = CausalLoss()
     elif "masked-lm" in cfg_data.task:
@@ -241,18 +242,7 @@ def _construct_vision_model(cfg_model, cfg_data, pretrained=True, **kwargs):
                 raise ValueError(f"Could not find ImageNet model {cfg_model} in torchvision.models or custom models.")
     else:
         # CIFAR Model from here:
-        if cfg_model == "resnet20":
-            def weights_init(m):
-                if hasattr(m, "weight"):
-                    m.weight.data.uniform_(-0.5, 0.5)
-                if hasattr(m, "bias"):
-                    if m.bias is not None:
-                        m.bias.data.uniform_(-0.5, 0.5)
-            model = resnet20(num_classes=10).to("cuda")
-            torch.manual_seed(1234)
-            model.apply(weights_init)
-            print("correct model??????????????")
-        elif "resnetgn" in cfg_model.lower():
+        if "resnetgn" in cfg_model.lower():
             block, layers = resnet_depths_to_config(int("".join(filter(str.isdigit, cfg_model))))
             model = ResNet(
                 block,
@@ -371,14 +361,6 @@ def _construct_vision_model(cfg_model, cfg_data, pretrained=True, **kwargs):
             )
         elif "lenet_zhu" == cfg_model.lower():
             model = LeNetZhu(num_channels=channels, num_classes=classes)
-            def weights_init(m):
-                if hasattr(m, "weight"):
-                    m.weight.data.uniform_(-0.5, 0.5)
-                if hasattr(m, "bias"):
-                    if m.bias is not None:
-                        m.bias.data.uniform_(-0.5, 0.5)
-            torch.manual_seed(1234)
-            model.apply(weights_init)
         elif "cnn6" == cfg_model.lower():
             # This is the model from R-GAP:
             model = torch.nn.Sequential(

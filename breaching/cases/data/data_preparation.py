@@ -23,14 +23,13 @@ def construct_dataloader(cfg_data, cfg_impl, user_idx=0, return_full_dataset=Fal
         from .datasets_vision import _build_dataset_vision, _split_dataset_vision
 
         dataset, collate_fn = _build_dataset_vision(cfg_data, split=cfg_data.examples_from_split, can_download=True)
-#         dataset = _split_dataset_vision(dataset, cfg_data, user_idx, return_full_dataset)
+        dataset = _split_dataset_vision(dataset, cfg_data, user_idx, return_full_dataset)
     elif cfg_data.modality == "text":
         from .datasets_text import _build_and_split_dataset_text
 
         dataset, collate_fn = _build_and_split_dataset_text(
             cfg_data, cfg_data.examples_from_split, user_idx, return_full_dataset,
         )
-        print("size of dataset in <construct_dataloader>: ", len(dataset))
     else:
         raise ValueError(f"Unknown data modality {cfg_data.modality}.")
 
@@ -70,4 +69,5 @@ def construct_dataloader(cfg_data, cfg_impl, user_idx=0, return_full_dataset=Fal
     )
     # Save the name for later:
     dataloader.name = cfg_data.name
+
     return dataloader

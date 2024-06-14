@@ -153,14 +153,7 @@ class UserSingleStep(torch.nn.Module):
             )
             outputs = self.model(**data)
             loss = self.loss(outputs, data["labels"])
-            
-#             for para in self.model.model.parameters():
-#                 print(para)
-#             print(data["labels"])
-            
-            dy_dx = torch.autograd.grad(loss, [param for param in self.model.parameters() if param.requires_grad])
-#             dy_dx = torch.autograd.grad(loss, self.model.parameters())
-            return dy_dx
+            return torch.autograd.grad(loss, self.model.parameters())
 
         if self.clip_value > 0:  # Compute per-example gradients and clip them in this case
             shared_grads = [torch.zeros_like(p) for p in self.model.parameters()]
@@ -233,14 +226,44 @@ class UserSingleStep(torch.nn.Module):
         self.data_key = "input_ids" if "input_ids" in data.keys() else "inputs"
         return data
 
-    def print(self, user_data, print_out=True, **kwargs):
+    def print(self, user_data, **kwargs):
         """Print decoded user data to output."""
         tokenizer = self.dataloader.dataset.tokenizer
         decoded_tokens = tokenizer.batch_decode(user_data["data"], clean_up_tokenization_spaces=True)
-        if print_out:
-            for line in decoded_tokens:
-                print(line)
-        return decoded_tokens
+        for line in decoded_tokens:
+            print(line)
+
+    def print_with_confidence(self, user_data, **kwargs):
+        """Print decoded user data to output."""
+        tokenizer = self.dataloader.dataset.tokenizer
+        colors = [160, 166, 172, 178, 184, 190]
+        thresholds = torch.as_tensor([0, 0.5, 0.75, 0.95, 0.99, 0.9999])
+
+        def bg_color(text, confidence_score):
+            threshold = ((confidence_score > thresholds) + torch.arange(0, len(colors)) / 100).argmax()
+            return "\33[48;5;" + str(colors[threshold]) + "m" + text + "\33[0m"
+
+        for sequence, sequence_confidence in zip(user_data["data"], user_data["confidence"]):
+            for token, c in zip(sequence, sequence_confidence):
+                decoded_token = tokenizer.decode(token)
+                print(bg_color(decoded_token + " ", c), end="")
+            print("\n")
+
+    def print_and_mark_correct(self, user_data, true_user_data, **kwargs):
+        """Print decoded user data to output."""
+        tokenizer = self.dataloader.dataset.tokenizer
+
+        def bg_color(text, correct):
+            if correct:
+                return "\33[48;5;190m" + text + "\33[0m"
+            else:
+                return "\33[48;5;160m" + text + "\33[0m"
+
+        for sequence, gt_sequence in zip(user_data["data"], true_user_data["data"]):
+            for token, gt_token in zip(sequence, gt_sequence):
+                decoded_token = tokenizer.decode(token)
+                print(bg_color(decoded_token + " ", token == gt_token), end="")
+            print("\n")
 
     def plot(self, user_data, scale=False, print_labels=False):
         """Plot user data to output. Probably best called from a jupyter notebook."""

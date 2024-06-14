@@ -14,9 +14,9 @@ log = logging.getLogger(__name__)
 def _build_and_split_dataset_text(cfg_data, split, user_idx=None, return_full_dataset=False):
     # os.environ["TOKENIZERS_PARALLELISM"] = "false"
     cfg_data.path = os.path.expanduser(cfg_data.path)
-    from datasets import load_dataset, Dataset, set_progress_bar_enabled
+    from datasets import load_dataset, Dataset, disable_progress_bar
 
-    set_progress_bar_enabled(False)
+#     disable_progress_bar()
 
     if user_idx is None:
         user_idx = torch.randint(0, cfg_data.default_clients, (1,)).item()
@@ -28,40 +28,49 @@ def _build_and_split_dataset_text(cfg_data, split, user_idx=None, return_full_da
 
     cfg_data.path = os.path.expanduser(cfg_data.path)
 
-    if cfg_data.name == "wikitext":
+    if cfg_data.name == "wikitext":  # random tokens shares the wikitext tokenizer
         raw_dataset = load_dataset("wikitext", "wikitext-103-v1", cache_dir=cfg_data.path, split=split)
-        return_full_dataset = True
         raw_dataset = _split_wikipedia_into_articles(raw_dataset, user_idx, return_full_dataset, min_length=25)
     elif cfg_data.name == "stackoverflow":
         raw_texts = load_stackoverflow(cfg_data.path, user_idx, return_full_dataset, split=split)
-        raw_dataset = Dataset.from_dict(dict(text=raw_texts), cache_dir=cfg_data.path)
+        raw_dataset = Dataset.from_dict(dict(text=raw_texts))
     elif cfg_data.name == "shakespeare":
         raw_texts = load_shakespeare(cfg_data.path, user_idx, return_full_dataset, split=split)
-        raw_dataset = Dataset.from_dict(dict(text=raw_texts), cache_dir=cfg_data.path)
+        raw_dataset = Dataset.from_dict(dict(text=raw_texts))
+    elif cfg_data.name == "random-tokens":
+        pass
     elif cfg_data.name == "cola":
-        return_full_dataset = True
         if return_full_dataset:
-            raw_dataset = load_dataset("glue", "cola", cache_dir=cfg_data.path)[split]
+            raw_datapoint = load_dataset("glue", "cola", cache_dir=cfg_data.path)[split]
+            raw_dataset = raw_datapoint
         else:
             raw_datapoint = load_dataset("glue", "cola", cache_dir=cfg_data.path)[split][user_idx]
             raw_dataset = Dataset.from_dict({k: [v] for k, v in raw_datapoint.items()})
     else:
         raise ValueError(f"Invalid text dataset {cfg_data.name} provided.")
 
-    columns = raw_dataset.column_names
-    if "label" in columns:
-        columns.remove("label")
-        raw_dataset = raw_dataset.rename_column("label", "labels")
     tokenizer = _get_tokenizer(cfg_data.tokenizer, cfg_data.vocab_size, cache_dir=cfg_data.path)
     tokenize, group_texts, collate_fn = _get_preprocessing(tokenizer, cfg_data)
-
-    tokenized_dataset = raw_dataset.map(tokenize, batched=True, remove_columns=columns, load_from_cache_file=False)
-    tokenized_dataset = tokenized_dataset.map(group_texts, batched=True, load_from_cache_file=False)
+    if cfg_data.name != "random-tokens":
+        columns = raw_dataset.column_names
+        if "label" in columns:
+            columns.remove("label")
+            raw_dataset = raw_dataset.rename_column("label", "labels")
+        tokenized_dataset = raw_dataset.map(tokenize, batched=True, remove_columns=columns, load_from_cache_file=False)
+        tokenized_dataset = tokenized_dataset.map(group_texts, batched=True, load_from_cache_file=False)
+    else:
+        generator = torch.Generator()
+        generator.manual_seed(user_idx + 233)
+        random_tokens = torch.randint(0, cfg_data.vocab_size, (cfg_data.size, cfg_data.shape[0]), generator=generator)
+        tokenized_dataset = Dataset.from_dict(dict(input_ids=random_tokens, labels=random_tokens))
 
     tokenized_dataset.set_format("torch")
+    tokenized_dataset.tokenizer = tokenizer  # Stash here
+
+    # Reduce train dataset according to cfg_data.size:
     if cfg_data.size < len(tokenized_dataset):
         tokenized_dataset = tokenized_dataset.select(range(0, cfg_data.size))
-    tokenized_dataset.tokenizer = tokenizer  # Stash here
+
     return tokenized_dataset, collate_fn
 
 
@@ -74,7 +83,7 @@ def _get_preprocessing(tokenizer, cfg_data):
     def tokenize(examples):
         return tokenizer(examples["text"], return_special_tokens_mask=cfg_data == "masked-lm")
 
-    if cfg_data.task in ["causal-lm", "masked-lm"]:
+    if "causal-lm" in cfg_data.task or "masked-lm" in cfg_data.task:
         block_size = cfg_data.shape[0]
         tokenizer.model_max_length = 1e10  # Only for batched pre-processing
 
@@ -91,12 +100,12 @@ def _get_preprocessing(tokenizer, cfg_data):
                 k: [t[i : i + block_size] for i in range(0, total_length, block_size)]
                 for k, t in concatenated_examples.items()
             }
-            if cfg_data.task == "causal-lm":
+            if "causal-lm" in cfg_data.task:
                 result["labels"] = result["input_ids"].copy()
             return result
 
-        if cfg_data.task == "causal-lm":
-            # This setting added "labels" during "group_texts"
+        if "causal-lm" in cfg_data.task:
+            # This setting adds "labels" during "group_texts"
             collate_fn = default_data_collator
         else:
             # This collate_fn generates "labels" automatically after masking
@@ -156,21 +165,8 @@ def _split_wikipedia_into_articles(dataset, user_idx=0, return_full_dataset=Fals
     #     [line for line in dataset["text"] if line.count("=") == 2 and len(line) < 100]
     # )  # this is good enough
     # print(f"Estimating {num_articles_estimate} articles in this wikipedia dump.")
-    if return_full_dataset:
-    # Super-dirty selector:
-        clean_line_ids = []
-        article_counter = 0
-        for idx, line in enumerate(dataset["text"]):
-            if " = " in line and " ; " not in line:  # exclude table headers
-                if line.count("=") == 2 and len(line) < 100:
-                    article_counter += 1
-                    # print(f"Checking article {article_counter}: {line} at idx {idx}")
-            elif len(line) < min_length:
-                pass
-            else:
-#                 if article_counter >= 2:
-                clean_line_ids.append(idx)
-    else:
+    if not return_full_dataset:
+        # Super-dirty selector:
         clean_line_ids = []
         article_counter = 0
         for idx, line in enumerate(dataset["text"]):
@@ -185,10 +181,10 @@ def _split_wikipedia_into_articles(dataset, user_idx=0, return_full_dataset=Fals
                     clean_line_ids.append(idx)
             if article_counter > user_idx + 1:
                 break
-    if len(clean_line_ids) > 0:
-        dataset = dataset.select(clean_line_ids)
-    else:
-        raise ValueError("This user does not exist or has no data.")
+        if len(clean_line_ids) > 0:
+            dataset = dataset.select(clean_line_ids)
+        else:
+            raise ValueError("This user does not exist or has no data.")
     return dataset
 
 
@@ -272,7 +268,7 @@ def url_basename(origin: str) -> str:
 def _fetch_lzma_file(origin: str, filename: str):
     """Fetches a LZMA compressed file and decompresses on the fly."""
     # Read and decompress in approximately megabyte chunks.
-    chunk_size = 2 ** 20
+    chunk_size = 2**20
     decompressor = lzma.LZMADecompressor()
     with urllib.request.urlopen(origin) as in_stream, open(filename, "wb") as out_stream:
         length = in_stream.headers.get("content-length")
@@ -301,14 +297,14 @@ def _load_sql_database(origin_url, cache_dir="~/data"):
 
 def _fetch_client_id(database_filepath, user_idx, split_name=None):
     """Fetches the list of client_ids.
-  Args:
-    database_filepath: A path to a SQL database.
-    user_idx: A numerical index to this user
-    split_name: An optional split name to filter on. If `None`, all client ids
-      are returned.
-  Returns:
-    An iterator of string client ids.
-  """
+    Args:
+      database_filepath: A path to a SQL database.
+      user_idx: A numerical index to this user
+      split_name: An optional split name to filter on. If `None`, all client ids
+        are returned.
+    Returns:
+      An iterator of string client ids.
+    """
     connection = sqlite3.connect(database_filepath)
     query = "SELECT DISTINCT client_id FROM client_metadata"
     if split_name is not None:

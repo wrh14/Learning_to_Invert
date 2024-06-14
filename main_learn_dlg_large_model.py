@@ -76,7 +76,8 @@ def train(grad_to_img_net, net, data_loader, sign=False, mask=None, prune_rate=N
             else:
                 labels = (torch.rand([len(images)]) < 0.7044).long()
         xs, ys = leakage_dataset(images, labels, net)
-        xs = torch.cat([xs[:, :start_i], xs[:, end_i:start_j]], dim=1)
+        if start_i is not None:
+            xs = torch.cat([xs[:, :start_i], xs[:, end_i:start_j]], dim=1)
         optimizer.zero_grad()
         batch_num = len(ys)
         batch_size = int(batch_num / leak_batch)
@@ -182,7 +183,8 @@ def test(grad_to_img_net, net, data_loader, sign=False, mask=None, prune_rate=No
         else:
             (images, labels) = data
         xs, ys = leakage_dataset(images, labels, net)
-        xs = torch.cat([xs[:, :start_i], xs[:, end_i:start_j]], dim=1)
+        if start_i is not None:
+            xs = torch.cat([xs[:, :start_i], xs[:, end_i:start_j]], dim=1)
         with torch.no_grad():
             batch_num = len(ys)
             batch_size = int(batch_num / leak_batch)
@@ -354,7 +356,10 @@ elif args.dataset.startswith("CIFAR10"):
     dst_validation = datasets.CIFAR10("~/.torch", download=True, train=False, transform=transform)    
     pseudo = False
 elif args.dataset.startswith("wikitext"):
-    dst_train = torch.load(f"fl_settings/wikitext_train_dataset.pt")
+    from breaching.cases.data.datasets_text import _build_and_split_dataset_text
+    config_train = torch.load(f"fl_settings/wikitext_train_dataset_config.pt")
+    dst_train, _ = _build_and_split_dataset_text(config_train, "train", user_idx=0, return_full_dataset=True)
+#     dst_train = torch.load(f"fl_settings/wikitext_train_dataset_new.pt")
     if len(args.dataset.split("-")) > 1:
         train_ratio = float(args.dataset.split("-")[1])
         torch.manual_seed(999)
@@ -364,11 +369,19 @@ elif args.dataset.startswith("wikitext"):
             pseudo = True
         else:
             pseudo = False
-    dst_test = torch.load(f"fl_settings/wikitext_test_dataset.pt")
-    dst_validation = torch.load(f"fl_settings/wikitext_validation_dataset.pt")
+    config_validation = torch.load(f"fl_settings/wikitext_validation_dataset_config.pt")
+    dst_validation, _ = _build_and_split_dataset_text(config_validation, "validation", user_idx=0, return_full_dataset=True)
+    
+#     dst_test = torch.load(f"fl_settings/wikitext_test_dataset.pt")
+#     dst_validation = torch.load(f"fl_settings/wikitext_validation_dataset_new.pt")
 elif args.dataset.startswith("cola"):
-    dst_train = torch.load(f"fl_settings/cola_train_dataset.pt")
-    dst_validation = torch.load(f"fl_settings/cola_validation_dataset.pt")
+    from breaching.cases.data.datasets_text import _build_and_split_dataset_text
+    config_train = torch.load(f"fl_settings/cola_train_dataset_config.pt")
+    dst_train, _ = _build_and_split_dataset_text(config_train, "train", user_idx=0, return_full_dataset=True)
+    config_validation = torch.load(f"fl_settings/cola_validation_dataset_config.pt")
+    dst_validation, _ = _build_and_split_dataset_text(config_validation, "validation", user_idx=0, return_full_dataset=True)
+#     dst_train = torch.load(f"fl_settings/cola_train_dataset_new.pt")
+#     dst_validation = torch.load(f"fl_settings/cola_validation_dataset_new.pt")
     if "pseudo" in args.dataset.split("-"):
         pseudo = True
     else:
@@ -443,6 +456,9 @@ if args.dataset.startswith("wikitext"):
                 break
             start_j += len(param.view(-1))
     model_size = start_i + start_j - end_i
+else:
+    start_i = None
+    
 
 #init the model
 torch.manual_seed(args.seed)
@@ -534,24 +550,24 @@ for epoch in tqdm(range(args.epochs)):
     if (epoch+1) == int(0.5 * args.epochs):
         for g in optimizer.param_groups:
             g['lr'] *= 0.1
-    checkpoint = {}
-    checkpoint["train_loss"] = train_loss
-    checkpoint["val_loss"] = test_loss
-    checkpoint["train_acc"] = train_acc
-    checkpoint["val_acc"] = test_acc
-    checkpoint["state_dict"] = grad_to_img_net.state_dict()
-    checkpoint["best_test_loss"] = best_test_loss
-    checkpoint["best_state_dict"] = best_state_dict
-    checkpoint["optimizer_state_dict"] = optimizer.state_dict()
-    if args.dataset.startswith("wikitext") or args.dataset.startswith("cola"):
-        checkpoint["val_reconstructed_imgs"] = reconstructed_imgs
-        checkpoint["gt_data"] = dst_validation["labels"]
-    elif args.dataset.startswith("CIFAR10"):
-        checkpoint["reconstructed_imgs"] = reconstructed_imgs[0]
-        checkpoint["gt_data"] = reconstructed_imgs[1]
-    checkpoint["epoch"] = epoch
-    torch.save(checkpoint, f"{save_dir}/checkpoint/{save_file_name}_version1.pt")
-    torch.save(checkpoint, f"{save_dir}/checkpoint/{save_file_name}_version2.pt")
+#     checkpoint = {}
+#     checkpoint["train_loss"] = train_loss
+#     checkpoint["val_loss"] = test_loss
+#     checkpoint["train_acc"] = train_acc
+#     checkpoint["val_acc"] = test_acc
+#     checkpoint["state_dict"] = grad_to_img_net.state_dict()
+#     checkpoint["best_test_loss"] = best_test_loss
+#     checkpoint["best_state_dict"] = best_state_dict
+#     checkpoint["optimizer_state_dict"] = optimizer.state_dict()
+#     if args.dataset.startswith("wikitext") or args.dataset.startswith("cola"):
+#         checkpoint["val_reconstructed_imgs"] = reconstructed_imgs
+#         checkpoint["gt_data"] = dst_validation["labels"]
+#     elif args.dataset.startswith("CIFAR10"):
+#         checkpoint["reconstructed_imgs"] = reconstructed_imgs[0]
+#         checkpoint["gt_data"] = reconstructed_imgs[1]
+#     checkpoint["epoch"] = epoch
+#     torch.save(checkpoint, f"{save_dir}/checkpoint/{save_file_name}_version1.pt")
+#     torch.save(checkpoint, f"{save_dir}/checkpoint/{save_file_name}_version2.pt")
     grad_to_img_net = grad_to_img_net.cuda()
-    del checkpoint
+#     del checkpoint
 
