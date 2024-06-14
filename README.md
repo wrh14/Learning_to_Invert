@@ -1,7 +1,19 @@
 # Learning To Invert: Simple Adaptive Attacks for Gradient Inversion in Federated Learning
 This code corresponds to the following paper:
 
-Ruihan Wu, Xiangyu Chen, Chuan Guo, and Kilian Q. Weinberger. [Learning To Invert: Simple Adaptive Attacks for Gradient Inversion in Federated Learning](https://openreview.net/forum?id=deit1AdsFU). UAI 2023. 
+Ruihan Wu, Xiangyu Chen, Chuan Guo, and Kilian Q. Weinberger. [Learning To Invert: Simple Adaptive Attacks for Gradient Inversion in Federated Learning](https://openreview.net/forum?id=Gt_GiNkBhu). UAI 2023. 
+
+## 0. Code and Environment Preparation
+1. Clone the repo.
+```
+git clone git@github.com:wrh14/Learning_to_Invert.git
+cd Learning_to_Invert
+git lfs fetch
+```
+2. Install the environment; python=`Python 3.9.18`
+```
+conda env create -f environment.yml
+```
 
 ## 1. Reproduce the Results of Vision Dataset (Table 1)
 ### 1.1 CIFAR10 and LeNet 
@@ -52,9 +64,9 @@ by setting `(leak_mode, lr)` as `(None, 1e-3)`, `(sign, 1e-5)`, `(prune-0.99, 1e
 ### 2.2 Wikitext and 3-Layers Transformers
 To reproduce the results in Table 1 for COLA and BERT, run the following script
 ```
-python main_learn_dlg_large_model.py --epochs 100 --batch_size 64 --dataset wikitext-hash --shared_model Transformer --model NLPMLP-600-1000 --lr $lr --leak_mode $leak_mode
+python main_learn_dlg_large_model.py --epochs 100 --batch_size 64 --dataset wikitext-0.1-hash --shared_model Transformer --model NLPMLP-600-1000 --lr $lr --leak_mode $leak_mode
 ```
-by setting `(leak_mode, lr)` as `(None, 1e-3)`, `(sign, 1e-5)`, `(prune-0.99, 1e-3)`, `(gauss-0.001, 1e-4)`.
+by setting `(leak_mode, lr)` as `(None, 1e-3)`, `(sign, 1e-5)`, `(prune-0.99, 1e-3)`, `(gauss-0.01, 1e-4)`.
 
 ### 2.3 OOD Auxiliary Data
 Run the scripts in 2.1 or 2.2 by setting `dataset` as `cola-pseudo-hash` or `wikitext-0.1-pseudo-hash` respectively.
